@@ -13,6 +13,7 @@ from agent import discover_models, analyze_artifacts, execute_agent_action
 from core.logic import run_pipeline
 from core.device_manager import get_device_manager
 from core.local_llm import get_local_llm_client
+from universal_model_loader import PinokioPathDetector
 from settings.app_settings import (
     MODEL_TYPES,
     QUANT_TYPES,
@@ -547,6 +548,10 @@ css = """
 def create_ui():
     """Create and return the Gradio interface."""
     
+    pinokio_root = None
+    if PinokioPathDetector:
+        pinokio_root = PinokioPathDetector.find_pinokio_root()
+
     # Define default paths for browser
     TEACHER_ROOT = os.getcwd()
     API_ROOT = os.path.abspath(os.path.join(os.getcwd(), "..", ".."))
@@ -556,6 +561,17 @@ def create_ui():
     dist_config = config.get("distillation", {})
     llm_config = config.get("local_llm", {})
     
+    default_teacher_path = dist_config.get("teacher_model_path", "")
+    
+    if pinokio_root:
+        path_invalid = not default_teacher_path or not os.path.exists(default_teacher_path)
+        
+        if path_invalid:
+            corrected_path = pinokio_root / "api" / "QTinker.git" / "app" / "bert_models" / "bert_large" / "bert-large-uncased-wwm"
+            
+            if corrected_path.exists():
+                default_teacher_path = str(corrected_path)
+
     with gr.Blocks() as demo:
         gr.Markdown(f"# {GRADIO_TITLE}")
         gr.Markdown(GRADIO_DESCRIPTION)
@@ -598,7 +614,7 @@ def create_ui():
                         teacher_model_path = gr.Textbox(
                             label="Teacher Model Path",
                             placeholder="Select a folder path from the Browser tab...",
-                            value=dist_config.get("teacher_model_path", ""),
+                            value=default_teacher_path,
                             info="Required for teacher-student mode"
                         )
 
