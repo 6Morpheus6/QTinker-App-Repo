@@ -9,6 +9,7 @@ import os
 import pandas as pd
 import subprocess
 import tempfile
+from pathlib import Path
 from agent import discover_models, analyze_artifacts, execute_agent_action
 from core.logic import run_pipeline
 from core.device_manager import get_device_manager
@@ -547,10 +548,6 @@ css = """
 
 def create_ui():
     """Create and return the Gradio interface."""
-    
-    pinokio_root = None
-    if PinokioPathDetector:
-        pinokio_root = PinokioPathDetector.find_pinokio_root()
 
     # Define default paths for browser
     TEACHER_ROOT = os.getcwd()
@@ -560,17 +557,20 @@ def create_ui():
     config = load_config()
     dist_config = config.get("distillation", {})
     llm_config = config.get("local_llm", {})
-    
-    default_teacher_path = dist_config.get("teacher_model_path", "")
-    
-    if pinokio_root:
-        path_invalid = not default_teacher_path or not os.path.exists(default_teacher_path)
-        
-        if path_invalid:
-            corrected_path = pinokio_root / "api" / "QTinker.git" / "app" / "bert_models" / "bert_large" / "bert-large-uncased-wwm"
-            
-            if corrected_path.exists():
-                default_teacher_path = str(corrected_path)
+
+    config_path_str = dist_config.get("teacher_model_path", "")
+    app_dir = Path(__file__).parent    
+    default_teacher_path = ""
+
+    if config_path_str:
+        if os.path.isabs(config_path_str):
+            default_teacher_path = config_path_str
+        else:
+            full_path = app_dir / config_path_str
+            if full_path.exists():
+                default_teacher_path = str(full_path)
+            else:
+                default_teacher_path = ""
 
     with gr.Blocks() as demo:
         gr.Markdown(f"# {GRADIO_TITLE}")
@@ -588,8 +588,9 @@ def create_ui():
                     with gr.Column(scale=3):
                         model_path = gr.Textbox(
                             label="Input Model Path (Target for Processing)",
+                            value="huawei-noah/TinyBERT_General_4L_312D",
                             placeholder="Select a folder path from the Browser tab...",
-                            info="Path to the model you want to quantize/distill (e.g. HuggingFace folder)"
+                            info="Default: TinyBERT. This is the student model path (e.g. HuggingFace folder) you want to distill/quantize."
                         )
                     
                     with gr.Column(scale=2):
@@ -600,7 +601,6 @@ def create_ui():
                             info="Select the library or type of the model"
                         )
                 
-                # 2. Knowledge Distillation Configuration Section
                 gr.Markdown("## Knowledge Distillation Configuration")
                 distillation_mode = gr.Radio(
                     choices=["placeholder", "teacher_student"],
