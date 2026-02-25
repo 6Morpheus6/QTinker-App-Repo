@@ -37,7 +37,6 @@ openvino>=2024.6.0
 
 # UI and visualization
 gradio>=4.0.0
-gradio-client
 pyyaml>=6.0.1
 requests>=2.32.0
 
